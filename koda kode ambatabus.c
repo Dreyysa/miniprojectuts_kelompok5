@@ -399,41 +399,202 @@ void prosesSeleksi(const Mahasiswa *m, HasilSeleksi *h)
 }
 
 /* ###################################################################### */
-/* ##  MAHASISWA 3 : HASIL & PENGUJIAN  (BELUM DIKERJAKAN)              ## */
-/* ##  Tampilkan hasil + alasan, buat rekap, uji batas, integrasi       ## */
-/* ##  Data hasil ada di struct HasilSeleksi (lihat bagian Mahasiswa 2) ## */
+/* ##  MAHASISWA 3 : HASIL & PENGUJIAN                                  ## */
+/* ##  Tampilkan hasil + alasan, rekap, uji batas kriteria, integrasi   ## */
 /* ###################################################################### */
 
-/* TODO Mahasiswa 3: tulis fungsi tampilan hasil & rekap di sini,
-   contoh: void tampilkanHasilSeleksi(const Mahasiswa *m, const HasilSeleksi *h);
-   Isi yang bisa dipakai: h->memenuhi, h->jumlahLolos, h->kriteria[i].lolos,
-   h->kriteria[i].deskripsi */
+#define MAX_PENDAFTAR 100
+
+/* ---------- Tampilkan hasil seleksi + alasan (1 mahasiswa) ---------- */
+void tampilkanHasilSeleksi(const Mahasiswa *m, const HasilSeleksi *h)
+{
+    printf("\n========================================\n");
+    printf("         HASIL SELEKSI BEASISWA\n");
+    printf("========================================\n");
+    printf("Nama   : %s\n", m->nama);
+    printf("NRP    : %s\n", m->nrp);
+
+    if (h->memenuhi) {
+        printf("Status : MEMENUHI SYARAT\n");
+    } else {
+        printf("Status : TIDAK MEMENUHI SYARAT\n");
+    }
+    printf("Kriteria terpenuhi: %d dari %d\n", h->jumlahLolos, JUMLAH_KRITERIA);
+
+    printf("\nAlasan / rincian kriteria:\n");
+    for (int i = 0; i < JUMLAH_KRITERIA; i++) {
+        printf("  %d. [%s] %s\n", i + 1,
+               h->kriteria[i].lolos ? "OK" : "XX",
+               h->kriteria[i].deskripsi);
+    }
+
+    if (!h->memenuhi) {
+        printf("\nAlasan tidak memenuhi:\n");
+        for (int i = 0; i < JUMLAH_KRITERIA; i++) {
+            if (!h->kriteria[i].lolos) {
+                printf("  - %s\n", h->kriteria[i].deskripsi);
+            }
+        }
+    } else {
+        printf("\nSemua kriteria terpenuhi.\n");
+    }
+    printf("========================================\n");
+}
+
+/* ---------- Rekap hasil seluruh pendaftar ---------- */
+void tampilkanRekap(const Mahasiswa *daftar, const HasilSeleksi *hasil, int n)
+{
+    int lolos = 0;
+
+    printf("\n==============================================================\n");
+    printf("                      REKAP HASIL SELEKSI\n");
+    printf("==============================================================\n");
+
+    if (n == 0) {
+        printf("Belum ada data pendaftar.\n");
+        printf("==============================================================\n");
+        return;
+    }
+
+    printf("%-4s %-12s %-22s %-5s %-16s\n", "No", "NRP", "Nama", "IPK", "Status");
+    printf("--------------------------------------------------------------\n");
+    for (int i = 0; i < n; i++) {
+        printf("%-4d %-12s %-22.22s %-5.2f %-16s\n",
+               i + 1, daftar[i].nrp, daftar[i].nama, daftar[i].ipk,
+               hasil[i].memenuhi ? "MEMENUHI" : "TIDAK MEMENUHI");
+        if (hasil[i].memenuhi) lolos++;
+    }
+    printf("--------------------------------------------------------------\n");
+    printf("Total pendaftar  : %d\n", n);
+    printf("Memenuhi         : %d (%.1f%%)\n", lolos, 100.0 * lolos / n);
+    printf("Tidak memenuhi   : %d (%.1f%%)\n", n - lolos, 100.0 * (n - lolos) / n);
+    printf("==============================================================\n");
+}
+
+/* ---------- Pengujian kondisi batas kriteria ---------- */
+typedef struct {
+    const char *keterangan;
+    Mahasiswa   data;
+    int         harapan;     /* 1 = harus MEMENUHI, 0 = harus TIDAK */
+} KasusUji;
+
+void ujiKondisiBatas(void)
+{
+    /* data dasar valid: semester 5, IPK 3.50, Rp3.000.000, 2 tanggungan, 2 prestasi */
+    KasusUji uji[] = {
+        {"Semua data normal (valid)",        {"1",  "Uji",  5, 3.50f, 3000000L, 2, 2}, 1},
+        {"IPK tepat 3.00 (batas bawah)",     {"2",  "Uji",  5, 3.00f, 3000000L, 2, 2}, 1},
+        {"IPK 2.99 (di bawah batas)",        {"3",  "Uji",  5, 2.99f, 3000000L, 2, 2}, 0},
+        {"Semester 3 (batas bawah)",         {"4",  "Uji",  3, 3.50f, 3000000L, 2, 2}, 1},
+        {"Semester 2 (di bawah batas)",      {"5",  "Uji",  2, 3.50f, 3000000L, 2, 2}, 0},
+        {"Semester 7 (batas atas)",          {"6",  "Uji",  7, 3.50f, 3000000L, 2, 2}, 1},
+        {"Semester 8 (di atas batas)",       {"7",  "Uji",  8, 3.50f, 3000000L, 2, 2}, 0},
+        {"Penghasilan Rp5.000.000 (batas)",  {"8",  "Uji",  5, 3.50f, 5000000L, 2, 2}, 1},
+        {"Penghasilan Rp5.000.001 (lewat)",  {"9",  "Uji",  5, 3.50f, 5000001L, 2, 2}, 0},
+        {"Prestasi 1 (batas bawah)",         {"10", "Uji",  5, 3.50f, 3000000L, 2, 1}, 1},
+        {"Prestasi 0 (di bawah batas)",      {"11", "Uji",  5, 3.50f, 3000000L, 2, 0}, 0},
+        {"Semua tepat di batas",             {"12", "Uji",  3, 3.00f, 5000000L, 0, 1}, 1},
+        {"Semua kriteria gagal",             {"13", "Uji",  1, 1.00f, 9000000L, 5, 0}, 0}
+    };
+    int total = (int)(sizeof(uji) / sizeof(uji[0]));
+    int sukses = 0;
+
+    printf("\n==============================================================\n");
+    printf("                PENGUJIAN KONDISI BATAS KRITERIA\n");
+    printf("==============================================================\n");
+    printf("%-4s %-34s %-9s %-9s %s\n", "No", "Kasus", "Harapan", "Hasil", "Uji");
+    printf("--------------------------------------------------------------\n");
+
+    for (int i = 0; i < total; i++) {
+        HasilSeleksi h;
+        prosesSeleksi(&uji[i].data, &h);
+
+        int cocok = (h.memenuhi == uji[i].harapan);
+        if (cocok) sukses++;
+
+        printf("%-4d %-34s %-9s %-9s %s\n", i + 1, uji[i].keterangan,
+               uji[i].harapan ? "MEMENUHI" : "TIDAK",
+               h.memenuhi     ? "MEMENUHI" : "TIDAK",
+               cocok ? "LULUS" : "GAGAL");
+    }
+    printf("--------------------------------------------------------------\n");
+    printf("Hasil pengujian: %d dari %d kasus lulus", sukses, total);
+    printf(sukses == total ? "  -> SEMUA LULUS\n" : "  -> ADA YANG GAGAL\n");
+    printf("==============================================================\n");
+}
 
 /* ###################################################################### */
-/* ##  MAIN : PENGHUBUNG M1 -> M2 -> M3                                 ## */
+/* ##  MAIN : INTEGRASI M1 -> M2 -> M3                                  ## */
 /* ###################################################################### */
+
+static void tampilkanMenu(void)
+{
+    printf("\n========================================\n");
+    printf("      SISTEM SELEKSI BEASISWA\n");
+    printf("========================================\n");
+    printf("1. Input pendaftar baru\n");
+    printf("2. Lihat rekap hasil seleksi\n");
+    printf("3. Uji kondisi batas kriteria\n");
+    printf("0. Keluar\n");
+    printf("----------------------------------------\n");
+}
+
 int main(void)
 {
-    Mahasiswa    mhs;
-    HasilSeleksi hasil;
+    Mahasiswa    daftar[MAX_PENDAFTAR];
+    HasilSeleksi hasil[MAX_PENDAFTAR];
+    int          jumlah = 0;
+    long         pilihan;
     char         ulang[MAX_BUFFER];
 
     do {
-        memset(&mhs, 0, sizeof(mhs));
+        tampilkanMenu();
+        if (!bacaInt("Pilih menu: ", &pilihan)) {
+            pilihan = -1;
+        }
 
-        /* ---- Mahasiswa 1 ---- */
-        inputDataMahasiswa(&mhs);
-        tampilkanDataMahasiswa(&mhs);
+        switch (pilihan) {
+        case 1:
+            do {
+                if (jumlah >= MAX_PENDAFTAR) {
+                    printf("\nKapasitas pendaftar penuh (%d).\n", MAX_PENDAFTAR);
+                    break;
+                }
+                memset(&daftar[jumlah], 0, sizeof(Mahasiswa));
 
-        /* ---- Mahasiswa 2 ---- */
-        prosesSeleksi(&mhs, &hasil);
+                /* ---- Mahasiswa 1 : input ---- */
+                inputDataMahasiswa(&daftar[jumlah]);
+                tampilkanDataMahasiswa(&daftar[jumlah]);
 
-        /* ---- Mahasiswa 3 (TODO): panggil fungsi tampilan hasil di sini ---- */
+                /* ---- Mahasiswa 2 : proses seleksi ---- */
+                prosesSeleksi(&daftar[jumlah], &hasil[jumlah]);
 
-        bacaBaris("\nInput mahasiswa lain? (y/n): ", ulang, sizeof(ulang));
-        printf("\n");
-    } while (ulang[0] == 'y' || ulang[0] == 'Y');
+                /* ---- Mahasiswa 3 : tampilkan hasil ---- */
+                tampilkanHasilSeleksi(&daftar[jumlah], &hasil[jumlah]);
+                jumlah++;
 
-    printf("Selesai.\n");
+                bacaBaris("\nInput mahasiswa lain? (y/n): ", ulang, sizeof(ulang));
+                printf("\n");
+            } while (ulang[0] == 'y' || ulang[0] == 'Y');
+            break;
+
+        case 2:
+            tampilkanRekap(daftar, hasil, jumlah);
+            break;
+
+        case 3:
+            ujiKondisiBatas();
+            break;
+
+        case 0:
+            if (jumlah > 0) tampilkanRekap(daftar, hasil, jumlah);
+            printf("\nSelesai.\n");
+            break;
+
+        default:
+            printf("\n[!] Menu tidak valid. Pilih 0-3.\n");
+        }
+    } while (pilihan != 0);
+
     return 0;
 }
